@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Traceline — open source research index</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root[data-theme="light"]{
+  --bg:#EDF2F9; --surface:#FFFFFF; --surface-2:#F6FAFE;
+  --ink:#0C2340; --ink-2:#4B6483; --ink-3:#7E93AC;
+  --line:#DDE7F2; --line-2:#C6D5E7;
+  --blue:#1D62D6; --blue-soft:#E3ECFC; --blue-deep:#0B3C8C;
+  --warn:#9A5B12; --stop:#A33232; --grid:rgba(12,35,64,.05);
+}
+:root[data-theme="dark"]{
+  --bg:#061527; --surface:#0C2038; --surface-2:#0F2841;
+  --ink:#E5EFFA; --ink-2:#A0B7D1; --ink-3:#6F8BA9;
+  --line:#163150; --line-2:#1F4267;
+  --blue:#5BA1FF; --blue-soft:#132F55; --blue-deep:#A2CAFF;
+  --warn:#E0A55C; --stop:#EE8080; --grid:rgba(160,195,235,.06);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:'Manrope',system-ui,-apple-system,'Segoe UI',sans-serif;
+  font-size:15px;line-height:1.5;display:flex;flex-direction:column;overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+a{color:var(--blue)}
+::selection{background:var(--blue-soft)}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:4px}
+
+.top{display:flex;align-items:center;gap:16px;padding:0 18px;height:60px;
+  background:var(--surface);border-bottom:1px solid var(--line);flex:0 0 auto}
+.mark{display:flex;align-items:baseline;gap:9px;font-weight:700;letter-spacing:-.02em;font-size:19px}
+.mark i{width:9px;height:9px;border-radius:50%;background:var(--blue);
+  box-shadow:0 0 0 4px var(--blue-soft);display:inline-block;transform:translateY(-1px)}
+.mark small{font-weight:500;font-size:13px;color:var(--ink-3);letter-spacing:0}
+.searchbox{position:relative;flex:1;max-width:500px;margin-left:auto}
+.searchbox input{width:100%;height:38px;padding:0 44px 0 38px;border-radius:8px;
+  border:1px solid var(--line-2);background:var(--surface-2);color:var(--ink);font-size:14px}
+.searchbox input::placeholder{color:var(--ink-3)}
+.searchbox input:focus{outline:none;border-color:var(--blue);background:var(--surface);box-shadow:0 0 0 3px var(--blue-soft)}
+.mag{position:absolute;left:13px;top:11px;width:16px;height:16px;stroke:var(--ink-3);fill:none;stroke-width:2}
+.searchbox kbd{position:absolute;right:10px;top:9px;font:500 11px/1 'Manrope',sans-serif;color:var(--ink-3);
+  border:1px solid var(--line-2);border-radius:4px;padding:5px 7px;background:var(--surface)}
+.ghost{height:34px;padding:0 12px;border-radius:7px;color:var(--ink-2);font-size:13px;font-weight:500;
+  display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.ghost:hover{background:var(--surface-2);color:var(--ink)}
+.ghost b{font-weight:600;color:var(--blue)}
+
+.shell{flex:1;display:grid;grid-template-columns:236px 352px 1fr;min-height:0}
+.shell.wide{grid-template-columns:236px 1fr}
+.shell.wide .list{display:none}
+.pane{min-height:0;overflow-y:auto}
+.side{border-right:1px solid var(--line);background:var(--bg);padding:14px 10px 40px}
+.list{border-right:1px solid var(--line);background:var(--surface)}
+.read{background:var(--surface-2);padding:34px 42px 70px}
+
+.side h3{font-size:11.5px;font-weight:600;color:var(--ink-3);letter-spacing:.05em;margin:16px 10px 6px}
+.side h3:first-child{margin-top:0}
+.navitem{display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;border-radius:7px;
+  font-size:13.5px;font-weight:500;color:var(--ink-2);text-align:left;line-height:1.3}
+.navitem:hover{background:var(--surface);color:var(--ink)}
+.navitem.on{background:var(--blue-soft);color:var(--blue-deep);font-weight:600}
+.navitem .n{flex:1}
+.navitem .c{font-size:11.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.navitem.on .c{color:var(--blue-deep)}
+.caret{width:10px;height:10px;stroke:currentColor;stroke-width:2;fill:none;flex:0 0 10px;opacity:.55;transition:transform .15s}
+.navitem[aria-expanded="true"] .caret{transform:rotate(90deg)}
+.subnav{margin:2px 0 8px 19px;border-left:1px solid var(--line-2);padding-left:6px}
+.subnav .navitem{font-size:13px;padding:6px 10px}
+.dot{width:7px;height:7px;border-radius:2px;background:var(--line-2);flex:0 0 7px}
+.navitem.on .dot,.navitem:hover .dot{background:var(--blue)}
+.feature{background:var(--surface);border:1px solid var(--line-2);color:var(--ink);
+  font-weight:600;font-size:14px;padding:11px 12px;margin-bottom:6px}
+.feature .c{font-weight:700;color:var(--blue);background:var(--blue-soft);
+  border-radius:999px;padding:1px 8px;font-size:11.5px}
+.feature .dot{width:8px;height:8px;border-radius:50%;background:var(--blue)}
+.feature:hover{border-color:var(--blue)}
+.feature.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.feature.on .c{background:rgba(255,255,255,.22);color:#fff}
+.feature.on .dot{background:#fff}
+:root[data-theme="dark"] .feature.on{color:#061527}
+:root[data-theme="dark"] .feature.on .c{background:rgba(6,21,39,.25);color:#061527}
+:root[data-theme="dark"] .feature.on .dot{background:#061527}
+.groupline{height:1px;background:var(--line);margin:14px 10px 2px}
+
+.listhead{position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--line);
+  padding:16px 18px 12px;z-index:2}
+.listhead h2{margin:0;font-size:17px;font-weight:700;letter-spacing:-.01em}
+.listhead p{margin:3px 0 0;font-size:12.5px;color:var(--ink-3)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
+.chip{font-size:12px;font-weight:500;padding:4px 10px;border-radius:999px;
+  border:1px solid var(--line-2);color:var(--ink-2)}
+.chip:hover{border-color:var(--blue);color:var(--blue)}
+.chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+:root[data-theme="dark"] .chip.on{color:#061527}
+.row{display:block;width:100%;text-align:left;padding:12px 18px 12px 15px;
+  border-bottom:1px solid var(--line);border-left:3px solid transparent}
+.row:hover{background:var(--surface-2)}
+.row.on{background:var(--blue-soft);border-left-color:var(--blue)}
+.row .t{display:flex;align-items:center;gap:8px;font-weight:600;font-size:14px}
+.row .t .fav{color:var(--blue);font-size:11.5px;font-weight:600}
+.row .d{margin:3px 0 0;font-size:12.5px;color:var(--ink-2);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.row .p{margin:5px 0 0;font-size:11.5px;color:var(--ink-3)}
+.row mark{background:transparent;color:var(--blue-deep);font-weight:700}
+.nores{padding:38px 20px;text-align:center;color:var(--ink-3);font-size:13.5px}
+
+.read .eyebrow{font-size:12.5px;color:var(--ink-3);margin:0 0 6px}
+.read h1{margin:0;font-size:31px;font-weight:700;letter-spacing:-.025em;line-height:1.12}
+.read .lede{font-size:16.5px;line-height:1.6;margin:18px 0 0;max-width:62ch}
+.read section{margin-top:30px;max-width:64ch}
+.read h4{margin:0 0 10px;font-size:13px;font-weight:600;color:var(--ink-3)}
+.tagrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
+.tag{font-size:11.5px;font-weight:600;padding:4px 9px;border-radius:5px;
+  background:var(--surface);border:1px solid var(--line-2);color:var(--ink-2)}
+.tag.free{color:var(--blue);border-color:var(--blue)}
+.tag.paid{color:var(--stop);border-color:var(--stop)}
+.tag.account{color:var(--warn);border-color:var(--warn)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:24px}
+.primary{background:var(--blue);color:#fff;padding:11px 18px;border-radius:8px;
+  font-weight:600;font-size:14px;text-decoration:none;display:inline-flex;align-items:center;gap:8px}
+:root[data-theme="dark"] .primary{color:#061527}
+.primary:hover{background:var(--blue-deep)}
+:root[data-theme="dark"] .primary:hover{filter:brightness(1.08)}
+.second{border:1px solid var(--line-2);padding:11px 16px;border-radius:8px;
+  font-weight:600;font-size:14px;color:var(--ink-2)}
+.second:hover{border-color:var(--blue);color:var(--blue)}
+.second.on{background:var(--blue-soft);border-color:var(--blue);color:var(--blue-deep)}
+.related{display:flex;flex-wrap:wrap;gap:8px}
+.related button{border:1px solid var(--line-2);border-radius:7px;padding:7px 12px;
+  font-size:13px;font-weight:500;color:var(--ink-2);background:var(--surface)}
+.related button:hover{border-color:var(--blue);color:var(--blue)}
+.host{font-size:12.5px;color:var(--ink-3);margin-top:12px;word-break:break-all}
+
+.steps{counter-reset:s;margin:30px 0 0;padding:0;list-style:none;max-width:64ch}
+.steps li{position:relative;padding:0 0 24px 40px;border-left:1px solid var(--line-2);margin-left:11px}
+.steps li:last-child{border-left-color:transparent;padding-bottom:0}
+.steps li::before{counter-increment:s;content:counter(s);position:absolute;left:-12px;top:-2px;
+  width:24px;height:24px;border-radius:50%;background:var(--blue-soft);color:var(--blue-deep);
+  font-size:12px;font-weight:700;display:grid;place-items:center}
+.steps h5{margin:1px 0 4px;font-size:15px;font-weight:600}
+.steps p{margin:0 0 9px;font-size:14px;color:var(--ink-2)}
+
+.about{max-width:72ch}
+.about .kicker{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;
+  color:var(--blue-deep);background:var(--blue-soft);padding:5px 11px;border-radius:999px}
+.about h1{margin:16px 0 0}
+.about p{font-size:15.5px;line-height:1.65;color:var(--ink-2);max-width:66ch}
+.about h3{font-size:16px;font-weight:700;margin:34px 0 8px;color:var(--ink)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(128px,1fr));gap:12px;margin:26px 0 4px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.stat b{display:block;font-size:26px;font-weight:700;letter-spacing:-.02em;color:var(--blue)}
+.stat span{font-size:12.5px;color:var(--ink-3)}
+.about ul{margin:8px 0 0;padding-left:18px;color:var(--ink-2);font-size:15px;line-height:1.65;max-width:66ch}
+.about li{margin-bottom:6px}
+.credit{margin-top:36px;padding:22px 24px;border-radius:12px;background:var(--surface);
+  border:1px solid var(--line);display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.credit .logo{width:44px;height:44px;border-radius:12px;background:var(--blue);color:#fff;
+  display:grid;place-items:center;font-weight:700;font-size:19px;flex:0 0 44px}
+:root[data-theme="dark"] .credit .logo{color:#061527}
+.credit h4{margin:0 0 2px;font-size:15px;font-weight:700;color:var(--ink)}
+.credit p{margin:0;font-size:13.5px}
+.notice{margin-top:26px;border-left:3px solid var(--blue);padding:4px 0 4px 16px}
+.notice p{font-size:14px;margin:0}
+.blank{height:100%;display:grid;place-items:center;text-align:center;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:26px 26px}
+.blank div{max-width:38ch}
+.blank h2{font-size:21px;margin:0 0 8px;font-weight:700}
+.blank p{color:var(--ink-2);font-size:14px;margin:0}
+.keys{display:flex;gap:12px;justify-content:center;margin-top:20px;flex-wrap:wrap;font-size:12px;color:var(--ink-3)}
+.keys b{font-weight:600;border:1px solid var(--line-2);border-radius:4px;padding:2px 6px;
+  color:var(--ink-2);background:var(--surface)}
+
+.backbar{display:none;align-items:center;gap:10px;padding:9px 12px;
+  background:var(--surface);border-bottom:1px solid var(--line);font-size:13px;color:var(--ink-3)}
+@media (max-width:960px){ .shell{grid-template-columns:200px 300px 1fr} .read{padding:28px 26px 60px} }
+@media (max-width:760px){
+  .top{gap:8px;padding:0 12px;height:56px}
+  .mark small{display:none}
+  .searchbox kbd{display:none}
+  .shell{grid-template-columns:1fr}
+  .side,.list,.read{display:none;border-right:0}
+  .side.show,.list.show,.read.show{display:block}
+  .read{padding:22px 18px 60px}
+  .backbar.show{display:flex}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="mark"><i></i>Traceline<small>open source research index</small></div>
+  <div class="searchbox">
+    <svg class="mag" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+    <input id="q" type="search" placeholder="Search tools, techniques, categories" autocomplete="off" aria-label="Search">
+    <kbd>/</kbd>
+  </div>
+  <button class="ghost" id="saveTab">Saved <b id="savedCount">0</b></button>
+  <button class="ghost" id="theme">Dark</button>
+</div>
+
+<div class="backbar" id="backbar"><button class="ghost" id="back">Back</button><span id="backLabel"></span></div>
+
+<div class="shell">
+  <nav class="pane side" id="side" aria-label="Categories"></nav>
+  <div class="pane list" id="list"></div>
+  <div class="pane read" id="read"></div>
+</div>
+
+<script>
+/* ========================= DATA ========================= */
+const DATA=[
+{n:"Usernames",d:"One handle, reused everywhere. Start here when you have a nickname.",c:[
+ {n:"WhatsMyName",u:"https://whatsmyname.app/",t:["free"],d:"Checks a handle against 600+ sites and reports where an account exists. Detection rules are open and community-maintained, so false positives are rarer than with older checkers."},
+ {n:"Sherlock",u:"https://github.com/sherlock-project/sherlock",t:["free","install"],d:"Command-line username hunter. Run it locally when you want output you can pipe into other tooling, or batch it across a list of handles."},
+ {n:"Maigret",u:"https://github.com/soxoj/maigret",t:["free","install"],d:"Goes past existence checks: pulls bios, display names, linked accounts and IDs from every profile it finds, then builds a report."},
+ {n:"Namechk",u:"https://namechk.com/",t:["free"],d:"Built for brand naming, useful in reverse. The taken slots tell you where the handle already exists."},
+ {n:"Instant Username",u:"https://instantusername.com/",t:["free"],d:"Live checks as you type. Thinner coverage, but fast for a first sweep before committing to a full scan."},
+ {n:"socid-extractor",u:"https://github.com/soxoj/socid-extractor",t:["free","install","method"],d:"Pulls the internal numeric ID behind a profile. Handles change, IDs don't, so the ID lets you re-find someone after a rename."},
+ {n:"Handle permutation",t:["method"],d:"People mutate handles predictably: underscores, doubled letters, birth years, a trailing 'real' or 'official'. Generate the variants and run the checkers across all of them."},
+ {n:"Gravatar by hash",u:"https://gravatar.com/",t:["free","method"],d:"Gravatar serves an avatar for the MD5 hash of an email address. Given the address you may get a photo and a linked profile without touching any platform."}
+]},
+
+{n:"Email addresses",d:"Breach history, mail patterns, and the profiles an address unlocks.",c:[
+ {n:"Have I Been Pwned",u:"https://haveibeenpwned.com/",t:["free"],d:"Which known breaches contain the address. The breach list doubles as a timeline of where the person held accounts and roughly when."},
+ {n:"Hunter.io",u:"https://hunter.io/",t:["account"],d:"Works out the address pattern a company uses — first.last@, f.last@, first@ — then lists the addresses seen in public sources."},
+ {n:"Epieos",u:"https://epieos.com/",t:["free"],d:"Checks an address against Google and other services, surfacing linked public profiles, reviews, photos and calendar visibility."},
+ {n:"EmailRep",u:"https://emailrep.io/",t:["free"],d:"Reputation summary: how old the address is, whether the domain is disposable, and where the address has been observed."},
+ {n:"Phonebook.cz",u:"https://phonebook.cz/",t:["free"],d:"Lists every address, subdomain and URL indexed for a domain. A fast way to map a company's whole mail namespace."},
+ {n:"Email Hippo",u:"https://tools.emailhippo.com/",t:["free"],d:"SMTP-level check on whether a mailbox exists. Catch-all domains accept everything, so treat a pass as weak evidence."},
+ {n:"Dehashed",u:"https://dehashed.com/",t:["paid"],d:"Searchable breach corpus across emails, names, usernames, addresses and phone numbers. Subscription only, widely used in incident work."},
+ {n:"LeakCheck",u:"https://leakcheck.io/",t:["paid","account"],d:"Similar breach index with a free preview that confirms whether a record exists before you pay for the detail."},
+ {n:"Address permutation",t:["method"],d:"Given a name and a company domain, generate the standard patterns and verify each one. Most organisations use a single scheme across everyone."},
+ {n:"Google account check",t:["method"],d:"A Gmail address run through Epieos, or dropped into a Google Docs share dialog, often reveals the display name and profile photo the owner set."}
+]},
+
+{n:"Phone numbers",d:"Carrier, line type, and the profile a number is attached to.",c:[
+ {n:"PhoneInfoga",u:"https://github.com/sundowndev/phoneinfoga",t:["free","install"],d:"Determines carrier, line type and region, then generates targeted search queries for the number across engines and social sites."},
+ {n:"Truecaller",u:"https://www.truecaller.com/",t:["account"],d:"Crowd-sourced caller ID drawn from users' address books. Often the quickest way to see the name a number is saved under."},
+ {n:"NumLookup",u:"https://www.numlookup.com/",t:["free"],d:"Free reverse lookup with carrier and location for US numbers, no account needed."},
+ {n:"Free Carrier Lookup",u:"https://freecarrierlookup.com/",t:["free"],d:"Returns carrier and whether the line is mobile or landline — worth knowing before you attempt any SMS-based verification check."},
+ {n:"Messaging app probe",t:["method"],d:"Saving a number as a contact in WhatsApp, Telegram or Signal reveals a display name and photo if the owner set one public. Use a dedicated research device; the other side may be notified."},
+ {n:"Password reset masking",t:["method"],d:"Reset flows on many services show a masked hint like +1 ••• ••• 4821. Matching hints across services confirms one person holds both accounts."},
+ {n:"Number formatting",t:["method"],d:"Search the number in every written form: with country code, without, spaced, dashed, dotted. Classified ads and leaked databases each use their own convention."}
+]},
+
+{n:"People and records",d:"Identity, family, address history and professional footprint.",c:[
+ {n:"Public records",c:[
+  {n:"CourtListener",u:"https://www.courtlistener.com/",t:["free"],d:"US federal and state opinions plus court documents via RECAP. Filings name addresses, employers and associates that appear nowhere else."},
+  {n:"PACER",u:"https://pacer.uscourts.gov/",t:["account","paid"],d:"The official US federal docket system. You pay per page, but it holds everything RECAP hasn't mirrored yet."},
+  {n:"Legacy.com",u:"https://www.legacy.com/",t:["free"],d:"Obituaries name surviving relatives, employers, home towns and maiden names in a single paragraph."},
+  {n:"Find a Grave",u:"https://www.findagrave.com/",t:["free"],d:"Burial records with dates and family links, photographed by volunteers worldwide."},
+  {n:"Federal inmate locator",u:"https://www.bop.gov/inmateloc/",t:["free"],d:"US federal prison search by name or register number with release dates. Most states run an equivalent system."},
+  {n:"Property record portals",u:"https://publicrecords.netronline.com/",t:["free"],d:"Directory of county assessor and recorder sites, where ownership, sale prices and mortgages are public."}
+ ]},
+ {n:"Directories",c:[
+  {n:"TruePeopleSearch",u:"https://www.truepeoplesearch.com/",t:["free"],d:"US addresses, relatives and phone history at no cost. Accuracy varies — treat entries as leads to confirm, not as facts."},
+  {n:"That's Them",u:"https://thatsthem.com/",t:["free"],d:"Reverse lookup across name, address, phone, email and even IP in one interface."},
+  {n:"FastPeopleSearch",u:"https://www.fastpeoplesearch.com/",t:["free"],d:"Another free aggregator with a different source mix, useful for cross-checking a result you already have."},
+  {n:"Whitepages",u:"https://www.whitepages.com/",t:["paid"],d:"Long-running US directory. The free tier shows partial data; full reports and history are paid."},
+  {n:"192.com",u:"https://www.192.com/",t:["paid"],d:"UK electoral roll, directory and company director data."},
+  {n:"Pipl",u:"https://pipl.com/",t:["paid"],d:"Identity resolution that links profiles, records and contact points. Enterprise pricing, no free tier."}
+ ]},
+ {n:"Genealogy",c:[
+  {n:"FamilySearch",u:"https://www.familysearch.org/",t:["account"],d:"Vast free archive of census, birth, marriage, death and immigration records, much of it digitised and indexed."},
+  {n:"Ancestry",u:"https://www.ancestry.com/",t:["paid"],d:"Deeper regional record coverage plus user-built trees that often expose living relatives."},
+  {n:"WikiTree",u:"https://www.wikitree.com/",t:["free"],d:"Collaborative single family tree, free to search, with sourcing standards better than most user trees."},
+  {n:"GenealogyBank",u:"https://www.genealogybank.com/",t:["paid"],d:"Newspaper obituary archive reaching further back than web-native sources."}
+ ]},
+ {n:"Professional",c:[
+  {n:"LinkedIn via search engine",t:["method"],d:"site:linkedin.com/in plus a company and title reaches profiles LinkedIn's own search throttles, and shows cached titles people later edited."},
+  {n:"Crunchbase",u:"https://www.crunchbase.com/",t:["account"],d:"Founders, funding rounds, board seats and acquisitions for startups and their investors."},
+  {n:"ORCID",u:"https://orcid.org/",t:["free"],d:"Persistent researcher IDs linking a person to every paper, affiliation and grant they've registered."},
+  {n:"Licence registries",t:["method"],d:"Doctors, lawyers, engineers, pilots and brokers appear in searchable public registers that confirm identity, employer and any discipline history."},
+  {n:"Conference archives",t:["method"],d:"Archived agendas and recorded talks place a named person at a date, a venue and an employer, usually with a photo attached."}
+ ]}
+]},
+
+{n:"Domains and infrastructure",d:"From a domain to its owner, its hosts, its history and everything beside it.",c:[
+ {n:"Registration",c:[
+  {n:"ViewDNS",u:"https://viewdns.info/",t:["free"],d:"Sixteen lookups in one place. Reverse whois and reverse IP are the valuable ones: they show what else the same registrant or server holds."},
+  {n:"Whoxy",u:"https://www.whoxy.com/",t:["account"],d:"Historical whois. Registrations made before privacy protection was switched on usually survive here with the original name and address."},
+  {n:"DomainTools",u:"https://www.domaintools.com/",t:["paid"],d:"The deepest whois history archive, with hosting timelines and screenshots. Expensive, and often decisive."},
+  {n:"ICANN Lookup",u:"https://lookup.icann.org/",t:["free"],d:"Authoritative current registration data straight from the registry, without a reseller's caching."},
+  {n:"Whoisology",u:"https://whoisology.com/",t:["account","paid"],d:"Cross-references whois fields so you can pivot on a shared phone number or street address across thousands of domains."}
+ ]},
+ {n:"DNS and subdomains",c:[
+  {n:"crt.sh",u:"https://crt.sh/",t:["free"],d:"Certificate transparency logs. Every TLS certificate issued is published, which quietly lists staging, admin and internal hosts nobody meant to expose."},
+  {n:"SecurityTrails",u:"https://securitytrails.com/",t:["account"],d:"Historical DNS: which IP a domain pointed at, and when it moved. Old records often predate the owner's cleanup."},
+  {n:"DNSdumpster",u:"https://dnsdumpster.com/",t:["free"],d:"Maps a domain's records, hosts and mail servers into a single diagram, with no traffic sent to the target."},
+  {n:"subfinder",u:"https://github.com/projectdiscovery/subfinder",t:["free","install"],d:"Passive subdomain enumeration across dozens of data sources. Fast, scriptable and quiet."},
+  {n:"DNSViz",u:"https://dnsviz.net/",t:["free"],d:"Visualises the DNSSEC chain and delegation path, exposing misconfigurations and forgotten name servers."},
+  {n:"Validin",u:"https://app.validin.com/",t:["free","account"],d:"Historical DNS and host-response data with generous free querying, good for tracking infrastructure that keeps moving."}
+ ]},
+ {n:"Hosts and ports",c:[
+  {n:"Shodan",u:"https://www.shodan.io/",t:["account","paid"],d:"Search engine for internet-connected devices: banners, open ports, exposed panels, cameras, industrial controllers. Free accounts see limited results."},
+  {n:"Censys",u:"https://search.censys.io/",t:["account"],d:"Host and certificate search with cleaner structured fields than Shodan, which makes pivoting between related assets easier."},
+  {n:"FOFA",u:"https://en.fofa.info/",t:["account"],d:"Chinese-operated equivalent with noticeably different coverage, particularly across Asian infrastructure."},
+  {n:"ZoomEye",u:"https://www.zoomeye.ai/",t:["account"],d:"Another independent scanner index, worth checking when Shodan and Censys disagree."},
+  {n:"BGP.HE.NET",u:"https://bgp.he.net/",t:["free"],d:"Who owns an IP range, which autonomous system announces it, and who they peer with."},
+  {n:"IPinfo",u:"https://ipinfo.io/",t:["free"],d:"Geolocation, ASN, company and hosting/VPN detection for any address, with a usable free API."},
+  {n:"Spur",u:"https://spur.us/",t:["paid"],d:"Identifies whether an IP belongs to a VPN, proxy or residential rotation service, and names which one."}
+ ]},
+ {n:"Websites and tech",c:[
+  {n:"urlscan.io",u:"https://urlscan.io/",t:["free"],d:"Loads a page in a sandbox and records every request, redirect, cookie and resource. Past public scans are searchable by domain."},
+  {n:"BuiltWith",u:"https://builtwith.com/",t:["free"],d:"Technology profile plus a reverse lookup on analytics and ad IDs — the standard way to link sites run by one operator."},
+  {n:"Wappalyzer",u:"https://www.wappalyzer.com/",t:["free","install"],d:"Extension version of the same idea, run live on the page you're viewing."},
+  {n:"SpyOnWeb",u:"https://spyonweb.com/",t:["free"],d:"Groups sites sharing a Google Analytics or AdSense identifier. Old, but still finds clusters others miss."},
+  {n:"Favicon hashing",t:["method"],d:"Shodan indexes favicon hashes. Hash a site's icon and search it to find every other host serving the same panel, including ones with no DNS record."},
+  {n:"robots.txt and sitemaps",t:["method"],d:"Both files are public by design and routinely list directories, staging paths and endpoints the navigation hides."}
+ ]},
+ {n:"History",c:[
+  {n:"Wayback Machine",u:"https://web.archive.org/",t:["free"],d:"Snapshots back to 1996. Deleted staff pages, old pricing and removed claims usually survive, and the CDX index lists every captured URL for a domain."},
+  {n:"archive.today",u:"https://archive.ph/",t:["free"],d:"On-demand freezing that captures JavaScript-rendered pages the Wayback Machine renders badly, and ignores robots.txt exclusions."},
+  {n:"CachedView",u:"https://cachedview.nl/",t:["free"],d:"Checks several cache sources at once when a page has only just disappeared."},
+  {n:"Wayback CDX queries",t:["method"],d:"Query the archive's index directly for every path ever seen under a domain, filtered by status code or file type. Finds PDFs and backups long since unlinked."}
+ ]}
+]},
+
+{n:"Search craft",d:"The operators and engines that do most of the work before any tool does.",c:[
+ {n:"Google Hacking Database",u:"https://www.exploit-db.com/google-hacking-database",t:["free","method"],d:"Thousands of tested operator combinations for exposed files, directories, cameras and login pages, categorised and dated."},
+ {n:"Core operators",t:["method"],d:"site: limits a domain, filetype: targets documents, intitle: and inurl: match page structure, quotes force exact phrases, a minus sign cuts noise. Three or four combined solve most problems."},
+ {n:"Yandex",u:"https://yandex.com/",t:["free"],d:"A genuinely different index with far stronger image matching, and much better coverage of Russian and Central Asian material."},
+ {n:"Bing",u:"https://www.bing.com/",t:["free"],d:"Keeps operators Google retired, including ip: to list sites on an address and linkfromdomain: to list a site's outbound links."},
+ {n:"Marginalia",u:"https://search.marginalia.nu/",t:["free"],d:"Indexes small, text-heavy, non-commercial sites that mainstream engines bury under SEO output."},
+ {n:"grep.app",u:"https://grep.app/",t:["free"],d:"Regex search across public Git repositories. Finds leaked keys, internal hostnames, and code copied between organisations."},
+ {n:"GitHub code search",u:"https://github.com/search",t:["account"],d:"Search by org, path, language and filename. Commit history holds secrets that were removed from the current tree."},
+ {n:"searchcode",u:"https://searchcode.com/",t:["free"],d:"Covers repositories beyond GitHub, including older forges that never migrated."},
+ {n:"Million Short",u:"https://millionshort.com/",t:["free"],d:"Removes the most popular sites from results so obscure sources rise to the surface."},
+ {n:"Query pivoting",t:["method"],d:"Take any distinctive string — a phone number, a bio sentence, an unusual misspelling — and search it verbatim in several engines. Copy-paste is how people leave trails."}
+]},
+
+{n:"Social platforms",d:"Platform-specific search, archives and account metadata.",c:[
+ {n:"Cross-platform",c:[
+  {n:"Social Searcher",u:"https://www.social-searcher.com/",t:["free"],d:"Keyword monitoring across several networks at once, without holding an account on any of them."},
+  {n:"Bellingcat Toolkit",u:"https://bellingcat.gitbook.io/toolkit",t:["free"],d:"Curated, actively maintained inventory of investigation tools with honest notes on what still works."},
+  {n:"OSINT Combine tools",u:"https://www.osintcombine.com/tools",t:["free"],d:"Free browser tools for social geo-search, chat analysis and image handling."}
+ ]},
+ {n:"X / Twitter",c:[
+  {n:"Advanced search",u:"https://x.com/search-advanced",t:["account"],d:"Date ranges, from:/to:, geocode radius and filter:media. Still the most precise way to query the platform."},
+  {n:"Deleted posts via archives",t:["method"],d:"Removed posts often persist as archived status pages. Search web.archive.org and archive.ph for the profile URL and for /status/ paths."},
+  {n:"Account age and ID",t:["method"],d:"The numeric account ID encodes roughly when an account was created. A recent ID on an account claiming years of history is a flag."}
+ ]},
+ {n:"Reddit",c:[
+  {n:"Redective",u:"https://www.redective.com/",t:["free"],d:"Breaks a user's history down by subreddit and posting hour, which suggests both interests and time zone."},
+  {n:"Reddit operators",t:["method"],d:"author:, subreddit:, self: and title: all work in the native search box, which covers most needs since the large third-party archives closed."},
+  {n:"Reveddit",u:"https://www.reveddit.com/",t:["free"],d:"Shows a user's removed comments — content moderators deleted but the author never did."}
+ ]},
+ {n:"Telegram",c:[
+  {n:"TGStat",u:"https://tgstat.com/",t:["free"],d:"Channel statistics, subscriber history and keyword search across public channels and groups."},
+  {n:"Telemetr",u:"https://telemetr.io/",t:["account"],d:"Tracks audience overlap and cross-posting, which maps networks of coordinated channels."},
+  {n:"Telegram via Google",t:["method"],d:"site:t.me plus a keyword finds public channels and invite links that in-app search never returns."}
+ ]},
+ {n:"Meta platforms",c:[
+  {n:"Meta Ad Library",u:"https://www.facebook.com/ads/library/",t:["free"],d:"Every ad running across Meta, with spend and targeting for political ads, plus page creation date, prior names and admin country."},
+  {n:"Instagram via engines",t:["method"],d:"site:instagram.com with a name, venue or hashtag reaches tagged posts that in-app search will not return."},
+  {n:"Facebook numeric ID",t:["method"],d:"Resolve a vanity URL to its numeric ID and use that instead; it survives username changes and links profiles to pages they administer."}
+ ]},
+ {n:"Video platforms",c:[
+  {n:"YouTube metadata",u:"https://mattw.io/youtube-metadata/",t:["free"],d:"Exact upload timestamps, geotags where present, and full comment retrieval for any public video."},
+  {n:"Filmot",u:"https://filmot.com/",t:["free"],d:"Search inside YouTube subtitles across millions of videos — finds a phrase spoken on camera rather than written in a title."},
+  {n:"TikTok via engines",t:["method"],d:"Engines index TikTok captions and comments unevenly, so run the same query in Google, Bing and Yandex before concluding nothing exists."}
+ ]},
+ {n:"Forums and chat",c:[
+  {n:"Disboard",u:"https://disboard.org/",t:["free"],d:"Public Discord server directory searchable by topic, language and tag."},
+  {n:"BoardReader",u:"https://boardreader.com/",t:["free"],d:"Searches forum and message board content that general engines crawl only shallowly."},
+  {n:"Public channel logs",t:["method"],d:"Many technical communities publish searchable IRC or Matrix logs going back a decade, complete with nicknames, time zones and email addresses."}
+ ]}
+]},
+
+{n:"Images and video",d:"Where a picture came from, whether it was altered, and what it shows.",c:[
+ {n:"Reverse search",c:[
+  {n:"Yandex Images",u:"https://yandex.com/images/",t:["free"],d:"The strongest general reverse image engine, especially for faces, buildings and crops of a larger scene."},
+  {n:"Google Lens",u:"https://lens.google/",t:["free"],d:"Best at objects, products, plants, logos and text inside images."},
+  {n:"TinEye",u:"https://tineye.com/",t:["free"],d:"Sorts by oldest match, which locates the first publication of a recycled photo and dates the reuse."},
+  {n:"Bing Visual Search",u:"https://www.bing.com/visualsearch",t:["free"],d:"Different index again, with a useful crop tool for isolating one element of a photo."},
+  {n:"PimEyes",u:"https://pimeyes.com/",t:["paid"],d:"Face search across the open web. Effective, invasive, and restricted by law in several jurisdictions — check your obligations before use."}
+ ]},
+ {n:"Metadata",c:[
+  {n:"ExifTool",u:"https://exiftool.org/",t:["free","install"],d:"Reads every field a file carries: camera body, lens, serial number, timestamps, GPS, editing software and version."},
+  {n:"Jimpl",u:"https://jimpl.com/",t:["free"],d:"Browser EXIF viewer that plots any embedded coordinates straight onto a map."},
+  {n:"Camera serial search",t:["method"],d:"Some cameras write a body serial into EXIF. Searching that serial can surface other photos taken by the same device on photo-sharing sites."}
+ ]},
+ {n:"Manipulation checks",c:[
+  {n:"FotoForensics",u:"https://fotoforensics.com/",t:["free"],d:"Error level analysis and related views that expose edited regions. Uploads become publicly visible, so never submit sensitive material."},
+  {n:"Forensically",u:"https://29a.ch/photo-forensics/",t:["free"],d:"Clone detection, noise analysis, magnifier and metadata, running entirely in your browser with no upload."},
+  {n:"Image Verification Assistant",u:"https://mever.iti.gr/forensics/",t:["free"],d:"Runs several forensic filters at once and produces a combined tampering report."}
+ ]},
+ {n:"Video",c:[
+  {n:"InVID / WeVerify",u:"https://www.invid-project.eu/tools-and-services/invid-verification-plugin/",t:["free","install"],d:"Splits a video into keyframes and reverse-searches each one. The standard first move on any viral clip."},
+  {n:"Frame-by-frame review",t:["method"],d:"Step through at quarter speed looking for cuts, mismatched shadows, repeated crowd elements and audio that doesn't match the room."},
+  {n:"Synthetic media checks",t:["method"],d:"Look at edges of hair and glasses, blink rate, teeth rendering, and whether light on the face matches the background. No detector beats careful looking."}
+ ]}
+]},
+
+{n:"Geolocation",d:"Placing a photo, a video or an event on the map — and dating it.",c:[
+ {n:"Imagery",c:[
+  {n:"Google Earth Pro",u:"https://earth.google.com/",t:["free"],d:"The historical imagery slider is the key feature: it shows how a site looked in past years and dates construction or demolition."},
+  {n:"Sentinel Hub EO Browser",u:"https://apps.sentinel-hub.com/eo-browser/",t:["free","account"],d:"Free recent satellite passes with infrared bands that reveal disturbed ground, burn scars and vegetation change."},
+  {n:"Yandex Maps",u:"https://yandex.com/maps/",t:["free"],d:"Better satellite and street-level coverage than Google across Eastern Europe, the Caucasus and Central Asia."},
+  {n:"Mapillary",u:"https://www.mapillary.com/",t:["free"],d:"Crowd-sourced street imagery covering roads Street View never drove, often more recent."},
+  {n:"KartaView",u:"https://kartaview.org/",t:["free"],d:"Open alternative with independent contributor coverage — check both before deciding a road is unphotographed."},
+  {n:"Zoom Earth",u:"https://zoom.earth/",t:["free"],d:"Near-live satellite, storm tracks and fire data layered on one map."}
+ ]},
+ {n:"Verification",c:[
+  {n:"SunCalc",u:"https://www.suncalc.org/",t:["free"],d:"Shadow direction and length for any place and date. Matching shadows in a photo narrows the hour, and sometimes the season."},
+  {n:"Overpass Turbo",u:"https://overpass-turbo.eu/",t:["free"],d:"Query OpenStreetMap directly: every water tower in a radius, every building of a given shape, every station of one brand."},
+  {n:"GeoHints",u:"https://geohints.com/",t:["free"],d:"Reference catalogue of road markings, bollards, plates, poles and signage by country — how to tell Poland from Slovakia at a glance."},
+  {n:"Wikimapia",u:"https://wikimapia.org/",t:["free"],d:"User-labelled map objects, including facilities that official maps leave deliberately blank."},
+  {n:"PeakVisor",u:"https://peakvisor.com/",t:["free"],d:"Identifies mountain skylines. A ridge line in the background is a fingerprint you can match to a viewpoint."},
+  {n:"Terrain profiling",t:["method"],d:"Reconstruct the camera position from horizon shape, road curvature and antenna placement, then confirm it against satellite imagery."}
+ ]},
+ {n:"Transport",c:[
+  {n:"Flightradar24",u:"https://www.flightradar24.com/",t:["free","paid"],d:"Live and historical flight tracking with aircraft registration, operator and route history."},
+  {n:"ADS-B Exchange",u:"https://globe.adsbexchange.com/",t:["free"],d:"Unfiltered feed — it carries aircraft that opt out of blocking on commercial trackers, including state and corporate fleets."},
+  {n:"MarineTraffic",u:"https://www.marinetraffic.com/",t:["free","paid"],d:"Vessel positions, port calls, ownership and flag. Deep track history sits behind a subscription."},
+  {n:"VesselFinder",u:"https://www.vesselfinder.com/",t:["free"],d:"Second AIS source, useful when a ship goes dark on one feed but not the other."},
+  {n:"Wigle",u:"https://wigle.net/",t:["account"],d:"Database of wireless networks mapped to coordinates. An SSID visible in a screenshot can place a device on a street."}
+ ]},
+ {n:"Weather and time",c:[
+  {n:"Meteostat",u:"https://meteostat.net/",t:["free"],d:"Historical hourly weather by station. Rain in a photo on a day that was dry is a contradiction worth chasing."},
+  {n:"WolframAlpha",u:"https://www.wolframalpha.com/",t:["free"],d:"Plain-language historical weather for a place and date, quick for sanity-checking a claim."},
+  {n:"Time zone reasoning",t:["method"],d:"Post timestamps, clock faces, shadow angle and sunrise tables should all agree. Where they don't, one of them is staged."}
+ ]}
+]},
+
+{n:"Companies and money",d:"Ownership, filings, sanctions and the flow of funds.",c:[
+ {n:"Registries",c:[
+  {n:"OpenCorporates",u:"https://opencorporates.com/",t:["free"],d:"Company records from 140 jurisdictions in one search, with officers linked across filings and borders."},
+  {n:"SEC EDGAR",u:"https://www.sec.gov/edgar/search/",t:["free"],d:"Full-text search across US filings. Exhibits, subsidiary lists and related-party notes hold the detail summaries omit."},
+  {n:"UK Companies House",u:"https://find-and-update.company-information.service.gov.uk/",t:["free"],d:"Free filings, director histories, charges and the register of persons with significant control."},
+  {n:"North Data",u:"https://www.northdata.com/",t:["free"],d:"German, Austrian and Swiss company data with generated ownership network diagrams."},
+  {n:"OpenOwnership",u:"https://www.openownership.org/",t:["free"],d:"Beneficial ownership records pooled from national registers, aimed at seeing through nominee structures."}
+ ]},
+ {n:"Investigative archives",c:[
+  {n:"OCCRP Aleph",u:"https://aleph.occrp.org/",t:["account"],d:"Cross-searches leaks, registries, court records and scraped documents collected by investigative reporters."},
+  {n:"ICIJ Offshore Leaks",u:"https://offshoreleaks.icij.org/",t:["free"],d:"Panama, Paradise, Pandora and Bahamas data in one entity graph showing shareholders, intermediaries and addresses."},
+  {n:"OpenSanctions",u:"https://www.opensanctions.org/",t:["free"],d:"Consolidated sanctions lists, politically exposed persons and watchlists, refreshed daily with a free API."},
+  {n:"Sayari",u:"https://sayari.com/",t:["paid"],d:"Commercial graph of trade, corporate and shipment records, strong on cross-border ownership chains."}
+ ]},
+ {n:"Trade and shipping",c:[
+  {n:"ImportGenius",u:"https://www.importgenius.com/",t:["paid"],d:"US customs bills of lading — who shipped what to whom, container by container."},
+  {n:"Panjiva",u:"https://panjiva.com/",t:["paid"],d:"Global trade records linking suppliers and buyers across dozens of countries."},
+  {n:"UN Comtrade",u:"https://comtradeplus.un.org/",t:["free"],d:"Official trade flows by commodity and country. Good for testing whether a claimed trade route is plausible at all."}
+ ]},
+ {n:"Cryptocurrency",c:[
+  {n:"Blockchair",u:"https://blockchair.com/",t:["free"],d:"Explorer covering many chains with database-style filters, so you can query by amount, date or script type."},
+  {n:"Etherscan",u:"https://etherscan.io/",t:["free"],d:"Ethereum addresses, tokens, contract source and labels that identify many exchanges and services."},
+  {n:"Breadcrumbs",u:"https://www.breadcrumbs.app/",t:["account"],d:"Visual flow-of-funds mapping between addresses, with a workable free tier for small cases."},
+  {n:"Chainabuse",u:"https://www.chainabuse.com/",t:["free"],d:"Community reports tying addresses to scams, ransomware and extortion campaigns."},
+  {n:"Arkham",u:"https://intel.arkm.com/",t:["account"],d:"Attribution-focused explorer that labels the entities behind clusters of addresses."}
+ ]}
+]},
+
+{n:"Documents and leaks",d:"Filings, papers, pastes and the archives that keep them.",c:[
+ {n:"DocumentCloud",u:"https://www.documentcloud.org/",t:["free"],d:"Newsroom document archive with OCR and full-text search across everything reporters have uploaded publicly."},
+ {n:"Internet Archive",u:"https://archive.org/",t:["free"],d:"Beyond the Wayback Machine: books, TV news transcripts, software, government collections and user uploads."},
+ {n:"Intelligence X",u:"https://intelx.io/",t:["account","paid"],d:"Indexes leaks, pastes, darknet content and whois by selector. Previews are free; full records need credits."},
+ {n:"Google Scholar",u:"https://scholar.google.com/",t:["free"],d:"Academic output including theses, which routinely name employers, funders, field sites and collaborators."},
+ {n:"MuckRock",u:"https://www.muckrock.com/",t:["free","account"],d:"Files US public records requests on your behalf and publishes every response in a searchable archive."},
+ {n:"Distributed Denial of Secrets",u:"https://ddosecrets.com/",t:["free"],d:"Published leak collections used by journalists and researchers; access rules vary dataset by dataset."},
+ {n:"Filetype dorking",t:["method"],d:"filetype:pdf, :xlsx, :docx and :pptx against a target domain surfaces budgets, org charts and internal decks never meant to be indexed."},
+ {n:"Document metadata",t:["method"],d:"Office and PDF files carry author names, internal paths, printer names and revision history. Run ExifTool over any document you obtain."}
+]},
+
+{n:"Threat intelligence",d:"Reputation, samples and behaviour for hosts, files and addresses.",c:[
+ {n:"VirusTotal",u:"https://www.virustotal.com/",t:["free","account"],d:"Scans files and URLs, but the real value is the relations view: contacted domains, dropped files and sibling samples."},
+ {n:"AbuseIPDB",u:"https://www.abuseipdb.com/",t:["free"],d:"Community reports of malicious activity per IP, with categories, timestamps and reporter counts."},
+ {n:"GreyNoise",u:"https://viz.greynoise.io/",t:["free","account"],d:"Separates internet-wide background scanning from traffic aimed specifically at you, which cuts alert volume sharply."},
+ {n:"MalwareBazaar",u:"https://bazaar.abuse.ch/",t:["free"],d:"Sample repository searchable by hash, tag, family and delivery method."},
+ {n:"URLhaus",u:"https://urlhaus.abuse.ch/",t:["free"],d:"Live malware distribution URLs with payload hashes and hosting details."},
+ {n:"Hybrid Analysis",u:"https://www.hybrid-analysis.com/",t:["free","account"],d:"Sandbox detonation reports covering network callbacks, dropped files and registry changes."},
+ {n:"ThreatFox",u:"https://threatfox.abuse.ch/",t:["free"],d:"Indicator exchange mapping IOCs to malware families, free to query and to submit."},
+ {n:"Pulsedive",u:"https://pulsedive.com/",t:["free","account"],d:"Enriches an indicator across feeds and shows the risk factors behind a verdict rather than just a score."}
+]},
+
+{n:"Dark web",d:"Indexes and monitoring for onion services, approached carefully.",c:[
+ {n:"Ahmia",u:"https://ahmia.fi/",t:["free"],d:"Searchable index of .onion sites reachable from the clear web, with abusive content filtered out."},
+ {n:"Tor Browser",u:"https://www.torproject.org/",t:["free","install"],d:"Required for any onion address, and worth understanding properly before you use it in an investigation."},
+ {n:"Ransomware leak trackers",u:"https://ransomwatch.telemetry.ltd/",t:["free"],d:"Aggregates ransomware group leak sites so you can see claimed victims without visiting the sites yourself."},
+ {n:"Operational caution",t:["method"],d:"Use a disposable virtual machine, never log in to anything personal, download nothing you don't need, and check the legal position in your jurisdiction first."}
+]},
+
+{n:"Government and legal",d:"Official registers, filings and open datasets.",c:[
+ {n:"Data.gov",u:"https://data.gov/",t:["free"],d:"US federal open data catalogue spanning hundreds of thousands of datasets across agencies."},
+ {n:"EU Open Data Portal",u:"https://data.europa.eu/",t:["free"],d:"Aggregated datasets from EU institutions and member states, much of it machine-readable."},
+ {n:"USAspending",u:"https://www.usaspending.gov/",t:["free"],d:"Every US federal contract and grant by recipient, which links companies to agencies and to each other."},
+ {n:"TED — EU tenders",u:"https://ted.europa.eu/",t:["free"],d:"European public procurement notices and awards, naming winning suppliers and contract values."},
+ {n:"USPTO patent search",u:"https://ppubs.uspto.gov/pubwebapp/",t:["free"],d:"Patent filings name inventors, assignees and addresses, and date a line of work precisely."},
+ {n:"WIPO Global Brand Database",u:"https://branddb.wipo.int/",t:["free"],d:"Links trademarks to owners across national registries worldwide."},
+ {n:"FCC licence search",u:"https://www.fcc.gov/licensing-databases/search",t:["free"],d:"US radio and transmitter licences with licensee names and site coordinates."},
+ {n:"US lobbying disclosures",u:"https://lda.senate.gov/system/public/",t:["free"],d:"Who is paid to lobby for whom, on which bills, and for how much."}
+]},
+
+{n:"News and media",d:"Coverage archives and monitoring.",c:[
+ {n:"GDELT",u:"https://www.gdeltproject.org/",t:["free"],d:"Indexes global news in a hundred languages with event coding — useful for timelines and for spotting coordinated coverage."},
+ {n:"Media Cloud",u:"https://www.mediacloud.org/",t:["account"],d:"Research platform for tracking how a story travels between outlets over time."},
+ {n:"Google News",u:"https://news.google.com/",t:["free"],d:"Date-restricted news search reaching older coverage that general search ranks away."},
+ {n:"Internet Archive TV News",u:"https://archive.org/details/tv",t:["free"],d:"Searchable closed-caption archive of US television news, clip by clip."},
+ {n:"Trove",u:"https://trove.nla.gov.au/",t:["free"],d:"Digitised Australian newspapers back to 1803, fully text-searchable."},
+ {n:"Chronicling America",u:"https://www.loc.gov/collections/chronicling-america/",t:["free"],d:"US historical newspapers from the Library of Congress, free and OCR-searchable."}
+]},
+
+{n:"Working safely",d:"Keeping the investigation clean, documented and lawful.",c:[
+ {n:"Separate research identity",t:["method"],d:"Dedicated email, number, browser profile and device for research work. Platforms leak contact suggestions in both directions, and one careless login links you to the case."},
+ {n:"Whonix",u:"https://www.whonix.org/",t:["free","install"],d:"Virtual machine that routes all traffic through Tor by design, so a misconfigured app can't leak your address."},
+ {n:"Firefox containers",u:"https://addons.mozilla.org/firefox/addon/multi-account-containers/",t:["free","install"],d:"Isolates cookies per identity inside one browser — cheap compartmentalisation for light work."},
+ {n:"Hunchly",u:"https://www.hunch.ly/",t:["paid","install"],d:"Records every page you visit during a case with hashes and timestamps, producing evidence that survives challenge."},
+ {n:"Document the source",t:["method"],d:"Capture the URL, an archive link, a screenshot and the date you saw it. Pages change and accounts vanish mid-investigation."},
+ {n:"Confirm before concluding",t:["method"],d:"Two sources that both copied one origin are a single source. Trace each claim back to where it actually started."},
+ {n:"Know the limits",t:["method"],d:"Open source is not unrestricted. Data protection law, platform terms, computer misuse statutes and anti-stalking law all apply to what you collect and what you do with it."},
+ {n:"Duty of care",t:["method"],d:"Consider the effect of publication on people who are not the subject — family, bystanders, witnesses. Redact what you don't need."}
+]}
+];
+
+/* ========================= PLAYBOOKS ========================= */
+const PLAYS=[
+{n:"You have an email address",d:"A single address usually opens into accounts, a name and a rough history.",s:[
+ {h:"Confirm it exists",p:"Check the mailbox before spending time on a typo. Catch-all domains accept anything, so a pass is weak evidence.",r:["Email Hippo"]},
+ {h:"Check breach history",p:"The breach list tells you which services the person used and roughly when they signed up.",r:["Have I Been Pwned","Dehashed"]},
+ {h:"Pull linked public profiles",p:"Google and review services expose display names and photos tied to the address.",r:["Epieos","Gravatar by hash"]},
+ {h:"Extract the handle",p:"The part before the @ is usually a username. Take it to the username checkers.",r:["WhatsMyName","Maigret"]},
+ {h:"Map the domain",p:"If it's a company address, list the rest of the namespace and confirm the naming pattern.",r:["Phonebook.cz","Hunter.io"]},
+ {h:"Search it verbatim",p:"Quoted, in several engines. Addresses get pasted into forums, CVs, whois records and git commits.",r:["Query pivoting","grep.app"]}
+]},
+{n:"You have a username",d:"Handles are the strongest cross-platform link most people leave behind.",s:[
+ {h:"Sweep the platforms",p:"Run the handle through a broad checker first, and note which hits look genuinely active.",r:["WhatsMyName","Sherlock"]},
+ {h:"Collect profile detail",p:"Bios, avatars, join dates and linked accounts matter more than the hit list itself.",r:["Maigret"]},
+ {h:"Grab the numeric ID",p:"IDs survive renames. Record them before the account changes or disappears.",r:["socid-extractor"]},
+ {h:"Try the variants",p:"Underscores, doubled letters, appended years. People rarely stray far from their own pattern.",r:["Handle permutation"]},
+ {h:"Reverse the avatar",p:"The same photo on another platform links two accounts even when the handle differs.",r:["Yandex Images","TinEye"]}
+]},
+{n:"You have a photo",d:"Work outward: where it appeared, whether it was altered, and where it was taken.",s:[
+ {h:"Read the metadata first",p:"Check for GPS, timestamps and camera details before anything else. Social platforms strip these; files sent directly often keep them.",r:["ExifTool","Jimpl"]},
+ {h:"Reverse search it widely",p:"Different engines hold different indexes. Run all of them, and crop to the distinctive elements.",r:["Yandex Images","Google Lens","TinEye"]},
+ {h:"Test for manipulation",p:"Look for edited regions and inconsistent noise before you build any conclusion on the image.",r:["Forensically","FotoForensics"]},
+ {h:"Identify the location",p:"Signage, plates, poles, architecture and terrain each narrow the country, then the street.",r:["GeoHints","Overpass Turbo","Mapillary"]},
+ {h:"Date it",p:"Shadow angle against the claimed date, and weather records against what the picture shows.",r:["SunCalc","Meteostat"]}
+]},
+{n:"You have a domain",d:"From one name to the owner, the infrastructure and everything else they run.",s:[
+ {h:"Registration, now and before",p:"Privacy protection is usually retro-fitted, so older records often still carry the real registrant.",r:["ICANN Lookup","Whoxy","ViewDNS"]},
+ {h:"Enumerate subdomains",p:"Certificate logs expose staging and admin hosts that were never linked publicly.",r:["crt.sh","subfinder","DNSdumpster"]},
+ {h:"Look at the hosts",p:"Open ports and banners tell you what the operator is running, and what else shares the box.",r:["Shodan","Censys","BGP.HE.NET"]},
+ {h:"Fingerprint the site",p:"Shared analytics and ad IDs are the classic link between sites run by one person.",r:["BuiltWith","SpyOnWeb","urlscan.io"]},
+ {h:"Read its history",p:"Archived versions show earlier owners, earlier claims and pages since deleted.",r:["Wayback Machine","archive.today","Wayback CDX queries"]}
+]},
+{n:"You have a phone number",d:"Classify the line, then find where the number has been published.",s:[
+ {h:"Classify the line",p:"Carrier, country and whether it's mobile, VoIP or landline shapes everything that follows.",r:["Free Carrier Lookup","PhoneInfoga"]},
+ {h:"Check caller ID databases",p:"Crowd-sourced address books frequently hold the name the number is saved under.",r:["Truecaller","NumLookup"]},
+ {h:"Probe messaging apps",p:"Display names and photos are often public. Use a research device, never your own.",r:["Messaging app probe"]},
+ {h:"Search every format",p:"With and without country code, spaced, dashed, dotted. Each source writes it differently.",r:["Number formatting","Query pivoting"]},
+ {h:"Correlate reset hints",p:"Masked digits shown by password reset flows can confirm one person holds several accounts.",r:["Password reset masking"]}
+]},
+{n:"You have a company name",d:"Registry first, then filings, then the people and the money behind it.",s:[
+ {h:"Find the legal entity",p:"Trading names hide the registered one. Get the registration number before anything else.",r:["OpenCorporates","UK Companies House"]},
+ {h:"Read the filings",p:"Directors, shareholders, charges and subsidiary lists are where the structure becomes visible.",r:["SEC EDGAR","North Data"]},
+ {h:"Screen for sanctions and litigation",p:"Check the entity and its officers before drawing any conclusion about legitimacy.",r:["OpenSanctions","CourtListener"]},
+ {h:"Follow the contracts",p:"Public procurement and trade records show who actually pays and who actually ships.",r:["USAspending","UN Comtrade","ImportGenius"]},
+ {h:"Map the people",p:"Officers recur across companies. Pivot on names and addresses, not just entities.",r:["OCCRP Aleph","ICIJ Offshore Leaks","OpenOwnership"]}
+]}
+];
+
+/* ========================= INDEX ========================= */
+const TAGS={free:"Free",account:"Account",paid:"Paid",install:"Install",method:"Method"};
+const flat=[];
+(function walk(nodes,path){nodes.forEach(n=>{const p=path.concat(n.n);
+  if(n.c) walk(n.c,p); else flat.push(Object.assign({},n,{path:p,id:p.join(' > ')}));});})(DATA,[]);
+const byName={}; flat.forEach(f=>{ if(!byName[f.n]) byName[f.n]=f; });
+const leavesIn=n=>n.c?n.c.reduce((a,x)=>a+leavesIn(x),0):1;
+const under=prefix=>flat.filter(f=>f.path.join(' > ').startsWith(prefix+' > '));
+
+let view={mode:'cat',i:0}, sel=null, filters=new Set(), open=new Set([0]), fav=new Set();
+const side=document.getElementById('side'), list=document.getElementById('list'),
+      read=document.getElementById('read'), qEl=document.getElementById('q'),
+      backbar=document.getElementById('backbar');
+
+/* saved items persist when storage is available, otherwise last for the session */
+async function loadFav(){ try{const r=await window.storage.get('traceline:saved');
+  if(r&&r.value) JSON.parse(r.value).forEach(x=>fav.add(x)); }catch(e){} paint(); }
+async function saveFav(){ paint(); try{ await window.storage.set('traceline:saved',JSON.stringify([...fav])); }catch(e){} }
+function paint(){ document.getElementById('savedCount').textContent=fav.size; renderSide(); renderList(); renderRead(); }
+
+/* ---------------- sidebar ---------------- */
+function navBtn(label,count,active,onClick,expandable,expanded,cls){
+  const b=document.createElement('button');
+  b.className='navitem'+(cls?' '+cls:'')+(active?' on':'');
+  if(expandable){ b.setAttribute('aria-expanded',!!expanded);
+    b.innerHTML='<svg class="caret" viewBox="0 0 12 12"><path d="M4 2l4 4-4 4"/></svg>'; }
+  else { const d=document.createElement('span'); d.className='dot'; b.appendChild(d); }
+  const n=document.createElement('span'); n.className='n'; n.textContent=label; b.appendChild(n);
+  if(count!=null){ const c=document.createElement('span'); c.className='c'; c.textContent=count; b.appendChild(c); }
+  b.onclick=onClick; return b;
+}
+function renderSide(){
+  side.innerHTML='';
+  const h0=document.createElement('h3'); h0.textContent='Everything'; side.appendChild(h0);
+  side.appendChild(navBtn('All tools',flat.length,view.mode==='all',()=>go({mode:'all'}),false,false,'feature'));
+  side.appendChild(navBtn('Saved',fav.size,view.mode==='fav',()=>go({mode:'fav'}),false,false,'feature'));
+  const line=document.createElement('div'); line.className='groupline'; side.appendChild(line);
+  const h=document.createElement('h3'); h.textContent='Start from'; side.appendChild(h);
+  DATA.forEach((cat,i)=>{
+    const nested=cat.c.some(x=>x.c);
+    side.appendChild(navBtn(cat.n,leavesIn(cat),view.mode==='cat'&&view.i===i,
+      ()=>{ if(nested){ open.has(i)?open.delete(i):open.add(i); } go({mode:'cat',i}); }, nested, open.has(i)));
+    if(nested&&open.has(i)){
+      const sub=document.createElement('div'); sub.className='subnav';
+      cat.c.forEach((s,j)=>{ if(!s.c) return;
+        sub.appendChild(navBtn(s.n,leavesIn(s),view.mode==='sub'&&view.i===i&&view.j===j,
+          e=>{e.stopPropagation(); go({mode:'sub',i,j});}));
+      });
+      side.appendChild(sub);
+    }
+  });
+  const h2=document.createElement('h3'); h2.textContent='Playbooks'; side.appendChild(h2);
+  PLAYS.forEach((p,k)=>side.appendChild(navBtn(p.n,null,view.mode==='play'&&view.k===k,()=>go({mode:'play',k}))));
+  const h3=document.createElement('h3'); h3.textContent='Project'; side.appendChild(h3);
+  side.appendChild(navBtn('About Traceline',null,view.mode==='about',()=>go({mode:'about'})));
+}
+
+/* ---------------- list ---------------- */
+function currentSet(){
+  if(view.mode==='cat'){const c=DATA[view.i];return{title:c.n,sub:c.d,items:under(c.n)};}
+  if(view.mode==='sub'){const c=DATA[view.i],s=c.c[view.j];return{title:s.n,sub:c.n,items:under(c.n+' > '+s.n)};}
+  if(view.mode==='all') return{title:'All tools',sub:'The whole index, alphabetical',items:[...flat].sort((a,b)=>a.n.localeCompare(b.n))};
+  if(view.mode==='fav') return{title:'Saved',sub:fav.size?'Your shortlist':'Press S on any tool to keep it here',items:flat.filter(f=>fav.has(f.id))};
+  if(view.mode==='search') return{title:'Results',sub:'for “'+view.q+'”',items:searchHits(view.q)};
+  if(view.mode==='play'){const p=PLAYS[view.k];
+    return{title:p.n,sub:'Playbook · '+p.s.length+' steps',items:p.s.flatMap(st=>(st.r||[]).map(r=>byName[r]).filter(Boolean))
+      .filter((v,i,a)=>a.indexOf(v)===i)};}
+  return null;
+}
+function renderList(){
+  const set=currentSet(); list.innerHTML='';
+  if(!set) return;
+  const items=set.items.filter(it=>!filters.size||(it.t||[]).some(t=>filters.has(t)));
+  const head=document.createElement('div'); head.className='listhead';
+  const h2=document.createElement('h2'); h2.textContent=set.title; head.appendChild(h2);
+  const p=document.createElement('p');
+  p.textContent=(set.sub?set.sub+' · ':'')+items.length+(items.length===1?' item':' items');
+  head.appendChild(p);
+  const chips=document.createElement('div'); chips.className='chips';
+  Object.keys(TAGS).forEach(t=>{
+    const c=document.createElement('button');
+    c.className='chip'+(filters.has(t)?' on':''); c.textContent=TAGS[t];
+    c.onclick=()=>{filters.has(t)?filters.delete(t):filters.add(t); renderList();};
+    chips.appendChild(c);
+  });
+  head.appendChild(chips); list.appendChild(head);
+
+  if(!items.length){
+    const e=document.createElement('p'); e.className='nores';
+    e.textContent=filters.size?'Nothing here matches those filters.':
+      (view.mode==='fav'?'No saved tools yet.':'Nothing here.');
+    list.appendChild(e); return;
+  }
+  items.forEach(it=>{
+    const b=document.createElement('button');
+    b.className='row'+(sel&&sel.id===it.id?' on':'');
+    const t=document.createElement('div'); t.className='t';
+    const nm=document.createElement('span');
+    nm.innerHTML=view.mode==='search'?hl(it.n,view.q):esc(it.n);
+    t.appendChild(nm);
+    if(fav.has(it.id)){const f=document.createElement('span');f.className='fav';f.textContent='saved';t.appendChild(f);}
+    b.appendChild(t);
+    const d=document.createElement('p'); d.className='d'; d.textContent=it.d; b.appendChild(d);
+    if(view.mode!=='cat'&&view.mode!=='sub'){
+      const pp=document.createElement('p'); pp.className='p'; pp.textContent=it.path.slice(0,-1).join(' · '); b.appendChild(pp);
+    }
+    b.onclick=()=>{ sel=it; renderList(); renderRead(); mobile('read'); };
+    list.appendChild(b);
+  });
+}
+
+/* ---------------- reading pane ---------------- */
+function renderRead(){
+  read.innerHTML='';
+  if(view.mode==='about') return readAbout();
+  if(sel) return readTool(sel);
+  if(view.mode==='play') return readPlay(PLAYS[view.k]);
+  read.innerHTML='<div class="blank"><div><h2>Pick a starting point</h2>'+
+    '<p>Investigations run on pivots: one fact becomes the next. Choose what you already have, or open a playbook for a worked sequence.</p>'+
+    '<div class="keys"><span><b>/</b> search</span><span><b>J</b><b>K</b> move</span>'+
+    '<span><b>Enter</b> open site</span><span><b>S</b> save</span><span><b>Esc</b> clear</span></div></div></div>';
+}
+function readTool(it){
+  const eb=document.createElement('p'); eb.className='eyebrow';
+  eb.textContent=it.path.slice(0,-1).join(' · '); read.appendChild(eb);
+  const h=document.createElement('h1'); h.textContent=it.n; read.appendChild(h);
+  if(it.t&&it.t.length){
+    const tr=document.createElement('div'); tr.className='tagrow';
+    it.t.forEach(t=>{const s=document.createElement('span');s.className='tag '+t;s.textContent=TAGS[t]||t;tr.appendChild(s);});
+    read.appendChild(tr);
+  }
+  const l=document.createElement('p'); l.className='lede'; l.textContent=it.d; read.appendChild(l);
+  const act=document.createElement('div'); act.className='actions';
+  if(it.u){
+    const a=document.createElement('a'); a.className='primary'; a.href=it.u;
+    a.target='_blank'; a.rel='noopener noreferrer'; a.textContent='Open '+it.n; act.appendChild(a);
+  }
+  const s=document.createElement('button');
+  s.className='second'+(fav.has(it.id)?' on':''); s.textContent=fav.has(it.id)?'Saved':'Save';
+  s.onclick=()=>{ fav.has(it.id)?fav.delete(it.id):fav.add(it.id); saveFav(); };
+  act.appendChild(s); read.appendChild(act);
+  if(it.u){const hs=document.createElement('p');hs.className='host';hs.textContent=it.u.replace(/^https?:\/\//,'');read.appendChild(hs);}
+
+  const parent=it.path.slice(0,-1).join(' > ');
+  const sibs=flat.filter(f=>f.path.slice(0,-1).join(' > ')===parent&&f.id!==it.id).slice(0,9);
+  if(sibs.length){
+    const sec=document.createElement('section');
+    const h4=document.createElement('h4'); h4.textContent='Also in '+it.path[it.path.length-2]; sec.appendChild(h4);
+    const w=document.createElement('div'); w.className='related';
+    sibs.forEach(sb=>{const b=document.createElement('button');b.textContent=sb.n;
+      b.onclick=()=>{sel=sb;renderList();renderRead();};w.appendChild(b);});
+    sec.appendChild(w); read.appendChild(sec);
+  }
+  const used=PLAYS.filter(p=>p.s.some(st=>(st.r||[]).includes(it.n)));
+  if(used.length){
+    const sec=document.createElement('section');
+    const h4=document.createElement('h4'); h4.textContent='Appears in'; sec.appendChild(h4);
+    const w=document.createElement('div'); w.className='related';
+    used.forEach(p=>{const b=document.createElement('button');b.textContent=p.n;
+      b.onclick=()=>{sel=null;go({mode:'play',k:PLAYS.indexOf(p)});mobile('read');};w.appendChild(b);});
+    sec.appendChild(w); read.appendChild(sec);
+  }
+}
+function readPlay(p){
+  const eb=document.createElement('p'); eb.className='eyebrow'; eb.textContent='Playbook'; read.appendChild(eb);
+  const h=document.createElement('h1'); h.textContent=p.n; read.appendChild(h);
+  const l=document.createElement('p'); l.className='lede'; l.textContent=p.d; read.appendChild(l);
+  const ol=document.createElement('ol'); ol.className='steps';
+  p.s.forEach(st=>{
+    const li=document.createElement('li');
+    const h5=document.createElement('h5'); h5.textContent=st.h; li.appendChild(h5);
+    const t=document.createElement('p'); t.textContent=st.p; li.appendChild(t);
+    if(st.r){
+      const w=document.createElement('div'); w.className='related';
+      st.r.forEach(name=>{
+        const f=byName[name]; if(!f) return;
+        const b=document.createElement('button'); b.textContent=name;
+        b.onclick=()=>jumpTo(f); w.appendChild(b);
+      });
+      li.appendChild(w);
+    }
+    ol.appendChild(li);
+  });
+  read.appendChild(ol);
+}
+function readAbout(){
+  const cats=DATA.length, subs=DATA.reduce((a,c)=>a+c.c.filter(x=>x.c).length,0);
+  const methods=flat.filter(f=>(f.t||[]).includes('method')).length;
+  const free=flat.filter(f=>(f.t||[]).includes('free')).length;
+  const wrap=document.createElement('div'); wrap.className='about';
+  wrap.innerHTML=
+   '<span class="kicker">A meltoint project</span>'+
+   '<h1>About Traceline</h1>'+
+   '<p>Traceline is an index of open source research tools, arranged by the thing you already have rather than by the name of the tool. '+
+   'Most directories in this field are long alphabetical lists that assume you already know what you are looking for. This one starts from a selector — a handle, an address, a domain, a photograph — and shows what each one can be turned into.</p>'+
+   '<div class="stats">'+
+     '<div class="stat"><b>'+flat.length+'</b><span>entries</span></div>'+
+     '<div class="stat"><b>'+cats+'</b><span>categories</span></div>'+
+     '<div class="stat"><b>'+subs+'</b><span>sub-sections</span></div>'+
+     '<div class="stat"><b>'+PLAYS.length+'</b><span>playbooks</span></div>'+
+     '<div class="stat"><b>'+free+'</b><span>free to use</span></div>'+
+     '<div class="stat"><b>'+methods+'</b><span>techniques</span></div>'+
+   '</div>'+
+   '<h3>How entries are chosen</h3>'+
+   '<p>Every entry earns its place by doing something the others cannot. Where two services overlap completely, only the one with better coverage is listed. '+
+   'Techniques sit alongside tools because a well-built query often beats a product, and queries do not go offline.</p>'+
+   '<ul>'+
+     '<li>Each entry says what the tool actually returns, not what its marketing claims.</li>'+
+     '<li>Cost is stated plainly: free, account required, or paid.</li>'+
+     '<li>Anything needing a local install is labelled, so you know before you click.</li>'+
+     '<li>Dead services are removed rather than left as broken links.</li>'+
+   '</ul>'+
+   '<h3>How to use it</h3>'+
+   '<p>Open the playbook matching what you have and work down the steps — each one explains the reasoning and links to the tools for that stage. '+
+   'If you already know the ground, browse the categories directly or search across the whole index. Save anything you use often; your shortlist stays between sessions.</p>'+
+   '<h3>Suggesting a tool</h3>'+
+   '<p>The index is only as good as its last update. Send additions, corrections and dead links through email@meltoint.com — include what the tool does that nothing else here already covers.</p>'+
+   '<div class="notice"><p>Open source does not mean unrestricted. Data protection law, platform terms, computer misuse statutes and anti-stalking law all apply to what you collect and what you do with it. Research responsibly, and consider the people in your results who are not your subject.</p></div>'+
+   '<div class="credit">'+
+     '<div class="logo">k</div>'+
+     '<div><h4>Built by meltoint</h4>'+
+     '<p>Traceline is developed and maintained as a meltoint project. '+
+     '<a href="https://meltoint.com" target="_blank" rel="noopener noreferrer">meltoint.com</a></p></div>'+
+   '</div>';
+  read.appendChild(wrap);
+}
+function jumpTo(f){
+  const i=DATA.findIndex(c=>c.n===f.path[0]);
+  const j=i>-1?DATA[i].c.findIndex(x=>x.c&&x.n===f.path[1]):-1;
+  open.add(i); view=j>-1?{mode:'sub',i,j}:{mode:'cat',i};
+  sel=f; renderSide(); renderList(); renderRead(); mobile('read');
+}
+
+/* ---------------- search ---------------- */
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function hl(text,q){
+  const safe=esc(text); if(!q) return safe;
+  return safe.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','ig'),'<mark>$1</mark>');
+}
+function searchHits(q){
+  const s=q.toLowerCase().trim(); if(!s) return [];
+  return flat.map(f=>{
+    const n=f.n.toLowerCase(), p=f.path.join(' ').toLowerCase(), d=(f.d||'').toLowerCase();
+    let sc=0;
+    if(n===s)sc=100; else if(n.startsWith(s))sc=80; else if(n.includes(s))sc=60;
+    else if(p.includes(s))sc=40; else if(d.includes(s))sc=20;
+    return sc?{f,sc}:null;
+  }).filter(Boolean).sort((a,b)=>b.sc-a.sc||a.f.n.localeCompare(b.f.n)).map(x=>x.f).slice(0,150);
+}
+
+/* ---------------- shell ---------------- */
+function go(v){
+  view=v;
+  document.querySelector('.shell').classList.toggle('wide',v.mode==='about');
+  if(v.mode==='play'||v.mode==='about'){ sel=null; renderSide(); renderList(); renderRead(); mobile('read'); return; }
+  renderSide(); renderList(); renderRead(); mobile('list');
+}
+function mobile(which){
+  if(window.innerWidth>760){ [side,list,read].forEach(p=>p.classList.add('show')); backbar.classList.remove('show'); return; }
+  [side,list,read].forEach(p=>p.classList.remove('show'));
+  ({side,list,read})[which].classList.add('show');
+  backbar.classList.toggle('show',which!=='side');
+  const label = sel ? sel.path.slice(0,-1).join(' · ')
+    : view.mode==='about' ? 'About' : view.mode==='play' ? 'Playbook' : 'Categories';
+  document.getElementById('backLabel').textContent = which==='read' ? label : 'Categories';
+  const up = (which==='read'&&view.mode!=='about') ? 'list' : 'side';
+  document.getElementById('back').onclick=()=>mobile(up);
+}
+
+qEl.addEventListener('input',()=>{
+  const v=qEl.value.trim();
+  if(!v){ sel=null; go({mode:'cat',i:view.i||0}); return; }
+  sel=null; view={mode:'search',q:v};
+  document.querySelector('.shell').classList.remove('wide');
+  renderSide(); renderList(); renderRead(); mobile('list');
+});
+document.getElementById('saveTab').onclick=()=>{ qEl.value=''; sel=null; go({mode:'fav'}); };
+document.getElementById('theme').onclick=e=>{
+  const r=document.documentElement, next=r.dataset.theme==='dark'?'light':'dark';
+  r.dataset.theme=next; e.currentTarget.textContent=next==='dark'?'Light':'Dark';
+};
+document.addEventListener('keydown',e=>{
+  const typing=document.activeElement===qEl;
+  if(e.key==='/'&&!typing){ e.preventDefault(); qEl.focus(); return; }
+  if(e.key==='Escape'){ qEl.value=''; qEl.blur(); sel=null; filters.clear(); go({mode:'cat',i:0}); return; }
+  if(typing) return;
+  const rows=[...list.querySelectorAll('.row')];
+  if(!rows.length) return;
+  let i=rows.findIndex(r=>r.classList.contains('on'));
+  if(e.key==='j'||e.key==='ArrowDown'){ e.preventDefault(); i=Math.min(rows.length-1,i+1); rows[i].click(); rows[i].scrollIntoView({block:'nearest'}); }
+  else if(e.key==='k'||e.key==='ArrowUp'){ e.preventDefault(); i=i<=0?0:i-1; rows[i].click(); rows[i].scrollIntoView({block:'nearest'}); }
+  else if(e.key==='Enter'&&sel&&sel.u){ window.open(sel.u,'_blank','noopener'); }
+  else if((e.key==='s'||e.key==='S')&&sel){ fav.has(sel.id)?fav.delete(sel.id):fav.add(sel.id); saveFav(); }
+});
+window.addEventListener('resize',()=>{
+  if(window.innerWidth>760){ [side,list,read].forEach(p=>p.classList.add('show')); backbar.classList.remove('show'); }
+});
+
+loadFav();
+renderSide(); renderList(); renderRead();
+if(window.innerWidth<=760) mobile('side');
+</script>
+</body>
+</html>
